@@ -1,0 +1,104 @@
+#stock-search-symbol {
+    height: 28%;
+}
+
+.container {
+    margin-top: 5px;
+    border-radius: 5px;
+    min-height: 15%;
+    background-color: white;
+}
+
+.btn-default {
+    background-color: #f5f5f5;
+}
+
+.btn-default:hover {
+    background-color: #337ab7;
+}
+
+@media screen and (max-width:700px) {
+    span#automaticrefresh {
+        display: none
+    }
+}
+
+.align-middle {
+    padding-top: 5px;
+}
+
+.list-group {
+    z-index: 1000;
+    position: relative;
+}
+
+.input-validation-error {
+    border: solid 1px red;
+}
+
+.table-label {
+    font-weight: bold;
+}
+#favorite-list{
+	-webkit-transition:all ease 0.1s;
+	-moz-transition:all ease 0.1s;
+	-o-transition:all ease 0.1s;
+	 transition:all ease 0.1s;
+	 position: relative;
+	 left: 0;
+}
+
+#stock-details-list{
+	-webkit-transition:all ease 0.2s;
+	-moz-transition:all ease 0.2s;
+	-o-transition:all ease 0.2s;
+	 transition:all ease 0.2s;
+	 position: relative;
+	 left: 0;
+}
+
+#favorite-list.ng-hide-add {
+  display: none !important;
+}
+
+#stock-details-list.ng-hide-add {
+  display: none !important;
+}
+
+
+#favorite-list.ng-hide-remove{
+  left: 100%;
+}
+
+#stock-details-list.ng-hide-remove{
+  left: -100%;
+}
+
+#autocomplete-validation-error{
+ display:none;
+ font-size:12px;
+}
+
+#table-error-message,#table-progress{
+  margin-top:70px;
+  margin-bottom:50px !important;
+}
+
+#tab-error-message,#chart-progress{
+  margin-top:22px;
+}
+
+.list-group{
+ cursor:pointer;
+}
+
+.indicator-img{
+ height:20px;
+ width:20px;
+}
+
+#main-panel.nav-tabs>li.active>a, #main-panel.nav-tabs>li.active>a:focus, #main-panel.nav-tabs>li.active>a:hover{
+  border-bottom-color:none;
+  background-color:#337ab7;
+  color:white;
+}

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HW8Fall2017</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+      <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.0/angular-material.min.css">
+      <script src = "https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
+      <script src = "https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular-animate.min.js"></script>
+      <script src = "https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular-aria.min.js"></script>
+      <script src = "https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular-messages.min.js"></script>
+      <script src = "https://ajax.googleapis.com/ajax/libs/angular_material/1.0.0/angular-material.min.js"></script>
+  <script src="http://ngmaterial.assets.s3.amazonaws.com/svg-assets-cache.js"></script>
+
+</head>
+<body>
+
+	<div class="autocompletedemoFloatingLabel" ng-controller="DemoCtrl as ctrl" ng-app="MyApp" layout="column" ng-cloak="">
+      <md-content class="md-padding">
+        <form ng-submit="$event.preventDefault()" name="searchForm">
+			<p>The following example demonstrates floating labels being used as a normal form element.</p>
+			<div layout-gt-sm="row">
+				</md-input-container>
+				    <md-autocomplete flex required 
+								md-item-text="item.display"
+								md-items="item in ctrl.data" 
+								md-search-text-change="ctrl.querySearch(ctrl.searchText)"
+								md-search-text="ctrl.searchText" 
+								md-selected-item="ctrl.selectedItem" 
+								md-no-cache="true" 
+								md-input-maxlength="30" 
+								md-input-minlength="2" 
+								md-input-name="autocompleteField" 
+					>
+								
+					<md-item-template>
+						<span md-highlight-text="ctrl.searchText">{{item.display}}</span>
+					</md-item-template>
+					<div ng-messages="searchForm.autocompleteField.$error" ng-if="searchForm.autocompleteField.$touched">
+						<div ng-message="required">You <b>must</b> have a favorite state.</div>
+						<div ng-message="minlength">Your entry is not long enough.</div>
+						<div ng-message="maxlength">Your entry is too long.</div>
+					</div>
+					</md-autocomplete>
+			</div>
+		</form> 
+      </md-content>
+    </div>
+  
+
+<script type="text/javascript">
+
+
+  angular
+    .module('MyApp',['ngMaterial', 'ngMessages', 'material.svgAssetsCache'])
+    .controller('DemoCtrl', DemoCtrl);
+
+  function DemoCtrl($http) {
+    var self = this;
+    
+    self.data = null;
+    self.selectedItem = null;
+    self.searchText = null;
+	
+	
+    
+    self.querySearch = function (query) {
+    
+		var search = query ? true:false;
+			if(search){
+			  var parameters={};
+			  parameters.symbol=query;
+			 
+				$http({
+						url: '/autocomplete',
+						method: "GET",
+						params: parameters
+					 })
+					 
+				.then(function(response) {
+					var output=[];
+					var data = response.data;
+					
+					for(var i in data){
+					  var result={};
+					  result.value = data[i]["Symbol"];
+					  result.display = data[i]["Symbol"] + " - " + data[i]["Name"] + " (" + data[i]["Exchange"] + ")";
+					  output.push(result);
+					}
+					self.data = output;
+					
+					return output;
+				 });  
+			}
+		
+		}
+  }
+
+
+
+</script>
+</body>
+</html>                            

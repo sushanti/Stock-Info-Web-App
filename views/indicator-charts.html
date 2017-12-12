@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Bootstrap Example</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+   <!-- HighStocks(and Highcharts)-->
+    <script src="https://code.highcharts.com/stock/highstock.js"></script>
+
+    <!-- Export Module-->
+    <script src="https://code.highcharts.com/modules/exporting.js"></script>
+    <script src="https://code.highcharts.com/modules/offline-exporting.js"></script>
+	
+	<!-- Moment js-->
+	<script src="https://momentjs.com/downloads/moment.js"> </script>
+	<script src="http://momentjs.com/downloads/moment-timezone.js"> </script>
+	<script src="https://momentjs.com/downloads/moment-timezone-with-data-2012-2022.js"> </script>
+</head>
+<body>
+
+  
+<div class="container">
+	<div id="chart-container"></div>
+</div>
+
+<script type="text/javascript">
+        //loadChartData("AAPL","PRICE");
+		
+		function dateBeforeSixMonths(date) {
+            var olddate = new Date(date);
+            olddate.setMonth(olddate.getMonth() - 6);
+            return olddate;
+        }
+
+        function formatDate(date) {
+            var day = date.substring(8, 10);
+            var month = date.substring(5, 7);
+            var year = date.substring(0, 4);
+            return month + "/" + day + "/" + year;
+        }
+		
+        function loadChartData(symbol,type){
+			var apikey = "SEXTJPXWV94X65Q2";
+			if(type.toUpperCase()==="PRICE"){
+			  $.ajax({ 
+					 type: "GET", 
+					 url: 'https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol='+symbol+'&outputsize=full&apikey='+apikey, 
+					 success: function(response){ 
+						  loadPriceVolumeChart(response);
+					 },
+					 error: function (request, status, error) {
+						console.log(status);
+					 }				 
+					 
+				 });
+			}
+			
+			else{
+			   $.ajax({ 
+					 type: "GET", 
+					 url: 'https://www.alphavantage.co/query?function=' + type + '&symbol=' + symbol + '&interval=daily&time_period=10&series_type=close&apikey=' + apikey,
+					 success: function(response){ 
+						  loadIndicatorChart(type,response);
+					 },
+					 error: function (request, status, error) {
+						console.log(error);
+					 }				 
+					 
+				 });
+			}
+		}
+  
+  
+		function loadIndicatorChart(indicator,data) {
+            
+                var technicalAnalysislabel = "Technical Analysis: " + indicator.toUpperCase();
+                var metadata = data["Meta Data"];
+                var technicalAnalysis = data[technicalAnalysislabel];
+                var dates = [];
+                var dataObject = [];
+                //var colors = ["#e00000", "#7cb5ec", "#000000", "#2f7ed8", "#0d233a"];
+                var j = 0;
+
+                var symbol = metadata["1: Symbol"];
+                var firstkey = Object.keys(technicalAnalysis)[0];
+                var keys = Object.keys(technicalAnalysis[firstkey]);
+
+                //Calculate first day of 6 months interval
+                var firstDay = dateBeforeSixMonths(firstkey);
+
+                for (var i in keys) {
+                    dataObject[i] = {
+                        name: keys.length > 1 ? symbol + " " + keys[i] : symbol,
+                        data: []
+                    }
+                }
+
+                //Populate Data
+                for (var k in technicalAnalysis) {
+                    var d = new Date(k);
+                    if (d >= firstDay) {
+                        var xdate = k.substring(5, 11);
+                        xdate = xdate.split('');
+                        xdate[2] = "/";
+                        xdate = xdate.join('');
+                        dates.push(xdate);
+                        for (i = 0; i < keys.length; i++) {
+                            dataObject[i].data.push(parseFloat(technicalAnalysis[k][keys[i]]));
+                        }
+                    }
+                }
+
+                while ((dates.length % 5) - 1 != 0) {
+                    dates.pop();
+                    for (i = 0; i < keys.length; i++) {
+                        dataObject[i].data.pop();
+                    }
+                }
+
+                options = {
+                    chart: {
+                        renderTo: 'chart-container',
+						zoomType: 'xy',
+                    },
+                    title: {
+                        text: metadata["2: Indicator"]
+                    },
+
+                    subtitle: {
+                        text: '<a class="subtitle" href="https://www.alphavantage.co/" target="blank">Source: Alpha Vantage</a>',
+                        useHTML: true
+                    },
+
+                    yAxis: {
+                        title: {
+                            text: "<b>" + indicator + "</b>"
+                        }
+                    },
+                    legend: {
+                        layout: 'vertical',
+                        align: 'right',
+                        verticalAlign: 'middle'
+                    },
+                    plotOptions: {
+                        series: {
+                            marker: {
+                                enabled: false,
+                                radius: 2
+                            },
+                            lineWidth: 1
+                        }
+                    },
+                    xAxis: {
+                        categories: dates,
+                        tickInterval: 5,
+                        reversed: true
+                    },
+                    series: dataObject,
+                    legend: {
+                        //layout: 'vertical',
+                        align: 'center' //,
+                            //verticalAlign: 'middle'
+                    },
+                    responsive: {
+                        rules: [{
+                            condition: {
+                                maxWidth: 500
+                            }
+                        }]
+                    },
+                    exporting: {
+                        enabled: true
+                    }
+                }
+
+                var chart1 = Highcharts.chart(options);
+				
+				getIndicatorChartOptions(indicator,data);
+
+        }
+		
+		function loadPriceVolumeChart(data) {
+           
+                var timeSeries = data["Time Series (Daily)"];
+                var dates = [];
+                var price = [];
+                var volume = [];
+
+                var firstKey = Object.keys(timeSeries)[0];
+                var keys = Object.keys(timeSeries[firstKey]);
+                var firstDay = dateBeforeSixMonths(firstKey);
+                var chartTitle = data["Meta Data"]["2. Symbol"]+" Stock Price and Volume";
+                var minPrice = timeSeries[firstKey]["4. close"];
+                var maxVolume = timeSeries[firstKey]["5. volume"];
+
+                for (var k in timeSeries) {
+                    var d = new Date(k);
+                    if (d >= firstDay) {
+                        var xdate = k.substring(5,11);
+                        xdate = xdate.split('');
+                        xdate[2] = "/";
+                        xdate = xdate.join('');
+
+                        dates.push(xdate);
+                        price.push(parseFloat(timeSeries[k]["4. close"]));
+                        volume.push(parseFloat(timeSeries[k]["5. volume"]));
+                        maxVolume = parseFloat(timeSeries[k]["5. volume"]) > maxVolume ? parseFloat(timeSeries[k]["5. volume"]) : maxVolume;
+                        
+                    }
+                }
+
+                while ((dates.length % 5) - 1 != 0) {
+                    dates.pop();
+                    price.pop();
+                    volume.pop();
+                }
+
+                options = {
+                    chart: {
+                        zoomType: 'xy',
+                        renderTo: 'chart-container'
+                    },
+                    title: {
+                        text: chartTitle,
+                    },
+                    subtitle: {
+                        text: '<a class="subtitle" href="https://www.alphavantage.co/" target="_blank">Source: Alpha Vantage</a>',
+                        useHTML: true
+                    },
+                    xAxis: [{
+                        categories: dates,
+                        crosshair: false,
+                        tickInterval: 5,
+                        reversed: true
+                    }],
+                    yAxis: [{
+                        title: {
+                            text: 'Volume',
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        },
+                        labels: {
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        },
+                        opposite: true
+
+                    }, {
+                        labels: {
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        },
+                        title: {
+                            text: 'Stock Price',
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        }
+                    }],
+                    tooltip: {
+                        shared: false
+                    },
+                    plotOptions: {
+                        area: {
+                            marker: {
+                                states: {
+                                    hover: {
+                                        enabled: true
+                                    }
+                                }
+                            }
+                        }
+                    },
+					
+                    legend: {
+                        align: 'center',
+						colors: ['#0000ff','#ff1717']
+                    },
+                    series: [{
+                        yAxis: 1,
+                        name: 'Price',
+                        type: 'area',
+                        data: price,
+                        lineColor: '#0000ff',
+                        zIndex: 1,
+                        dataLabels: {
+                            overflow: "justify"
+                        },
+                        lineWidth: 1
+                    }, {
+                        name: "Volume",
+                        type: 'column',
+                        color: '#ff1717',
+                        data: volume,
+                        zIndex: 2,
+                        dataLabels: {
+                            overflow: "justify"
+                        }
+                    }],
+                    exporting: {
+                        enabled: true
+                    }
+                };
+
+                var chart1 = Highcharts.chart(options);
+				
+				var test = getPriceVolumeChartOptions(data);
+           
+
+        }
+		
+		function getIndicatorChartOptions(indicator,data) {
+                var options={};
+                var technicalAnalysislabel = "Technical Analysis: " + indicator.toUpperCase();
+                var metadata = data["Meta Data"];
+                var technicalAnalysis = data[technicalAnalysislabel];
+                var dates = [];
+                var dataObject = [];
+                //var colors = ["#e00000", "#7cb5ec", "#000000", "#2f7ed8", "#0d233a"];
+                var j = 0;
+
+                var symbol = metadata["1: Symbol"];
+                var firstkey = Object.keys(technicalAnalysis)[0];
+                var keys = Object.keys(technicalAnalysis[firstkey]);
+
+                //Calculate first day of 6 months interval
+                var firstDay = dateBeforeSixMonths(firstkey);
+
+                for (var i in keys) {
+                    dataObject[i] = {
+                        name: keys.length > 1 ? symbol + " " + keys[i] : symbol,
+                        data: []
+                    }
+                }
+
+                //Populate Data
+                for (var k in technicalAnalysis) {
+                    var d = new Date(k);
+                    if (d >= firstDay) {
+                        var xdate = k.substring(5, 11);
+                        xdate = xdate.split('');
+                        xdate[2] = "/";
+                        xdate = xdate.join('');
+                        dates.push(xdate);
+                        for (i = 0; i < keys.length; i++) {
+                            dataObject[i].data.push(parseFloat(technicalAnalysis[k][keys[i]]));
+                        }
+                    }
+                }
+
+                while ((dates.length % 5) - 1 != 0) {
+                    dates.pop();
+                    for (i = 0; i < keys.length; i++) {
+                        dataObject[i].data.pop();
+                    }
+                }
+
+                options = {
+                    chart: {
+                        renderTo: 'chart-container',
+						zoomType: 'xy',
+                    },
+                    title: {
+                        text: metadata["2: Indicator"]
+                    },
+
+                    subtitle: {
+                        text: '<a class="subtitle" href="https://www.alphavantage.co/" target="blank">Source: Alpha Vantage</a>',
+                        useHTML: true
+                    },
+
+                    yAxis: {
+                        title: {
+                            text: "<b>" + indicator + "</b>"
+                        }
+                    },
+                    legend: {
+                        layout: 'vertical',
+                        align: 'right',
+                        verticalAlign: 'middle'
+                    },
+                    plotOptions: {
+                        series: {
+                            marker: {
+                                enabled: false,
+                                radius: 2
+                            },
+                            lineWidth: 1
+                        }
+                    },
+                    xAxis: {
+                        categories: dates,
+                        tickInterval: 5,
+                        reversed: true
+                    },
+                    series: dataObject,
+                    legend: {
+                        //layout: 'vertical',
+                        align: 'center' //,
+                            //verticalAlign: 'middle'
+                    },
+                    responsive: {
+                        rules: [{
+                            condition: {
+                                maxWidth: 500
+                            }
+                        }]
+                    },
+                    exporting: {
+                        enabled: true
+                    }
+                }
+				
+				console.log(options);
+
+                return options;
+
+        }
+		
+		
+		
+		 
+		
+		function getPriceVolumeChartOptions(data) {
+                var options={};
+                var timeSeries = data["Time Series (Daily)"];
+                var dates = [];
+                var price = [];
+                var volume = [];
+
+                var firstKey = Object.keys(timeSeries)[0];
+                var keys = Object.keys(timeSeries[firstKey]);
+                var firstDay = dateBeforeSixMonths(firstKey);
+                var chartTitle = data["Meta Data"]["2. Symbol"]+" Stock Price and Volume";
+                var minPrice = timeSeries[firstKey]["4. close"];
+                var maxVolume = timeSeries[firstKey]["5. volume"];
+
+                for (var k in timeSeries) {
+                    var d = new Date(k);
+                    if (d >= firstDay) {
+                        var xdate = k.substring(5,11);
+                        xdate = xdate.split('');
+                        xdate[2] = "/";
+                        xdate = xdate.join('');
+
+                        dates.push(xdate);
+                        price.push(parseFloat(timeSeries[k]["4. close"]));
+                        volume.push(parseFloat(timeSeries[k]["5. volume"]));
+                        maxVolume = parseFloat(timeSeries[k]["5. volume"]) > maxVolume ? parseFloat(timeSeries[k]["5. volume"]) : maxVolume;
+                        
+                    }
+                }
+
+                while ((dates.length % 5) - 1 != 0) {
+                    dates.pop();
+                    price.pop();
+                    volume.pop();
+                }
+
+                options = {
+                    chart: {
+                        zoomType: 'xy',
+                        renderTo: 'chart-container'
+                    },
+                    title: {
+                        text: chartTitle,
+                    },
+                    subtitle: {
+                        text: '<a class="subtitle" href="https://www.alphavantage.co/" target="_blank">Source: Alpha Vantage</a>',
+                        useHTML: true
+                    },
+                    xAxis: [{
+                        categories: dates,
+                        crosshair: false,
+                        tickInterval: 5,
+                        reversed: true
+                    }],
+                    yAxis: [{
+                        title: {
+                            text: 'Volume',
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        },
+                        labels: {
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        },
+                        opposite: true
+
+                    }, {
+                        labels: {
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        },
+                        title: {
+                            text: 'Stock Price',
+                            style: {
+                                color: Highcharts.getOptions().colors[1]
+                            }
+                        }
+                    }],
+                    tooltip: {
+                        shared: false
+                    },
+                    plotOptions: {
+                        area: {
+                            marker: {
+                                states: {
+                                    hover: {
+                                        enabled: true
+                                    }
+                                }
+                            }
+                        }
+                    },
+					
+                    legend: {
+                        align: 'center',
+						colors: ['#0000ff','#ff1717']
+                    },
+                    series: [{
+                        yAxis: 1,
+                        name: 'Price',
+                        type: 'area',
+                        data: price,
+                        lineColor: '#0000ff',
+                        zIndex: 1,
+                        dataLabels: {
+                            overflow: "justify"
+                        },
+                        lineWidth: 1
+                    }, {
+                        name: "Volume",
+                        type: 'column',
+                        color: '#ff1717',
+                        data: volume,
+                        zIndex: 2,
+                        dataLabels: {
+                            overflow: "justify"
+                        }
+                    }],
+                    exporting: {
+                        enabled: true
+                    }
+                };
+
+                return options;
+           
+
+        }
+		
+		
+		loadPriceVolumeChart({"Meta Data":{"1. Information":"Daily Prices (open, high, low, close) and Volumes","2. Symbol":"AA","3. Last Refreshed":"2017-11-30","4. Output Size":"Full size","5. Time Zone":"US\/Eastern"},"Time Series (Daily)":{"2017-11-30":{"1. open":"41.5000","2. high":"42.1600","3. low":"41.1300","4. close":"41.5100","5. volume":"4371334"},"2017-11-29":{"1. open":"42.1900","2. high":"42.3200","3. low":"40.8000","4. close":"41.2400","5. volume":"4938871"},"2017-11-28":{"1. open":"41.8100","2. high":"43.7500","3. low":"41.2099","4. close":"43.3000","5. volume":"6890455"},"2017-11-27":{"1. open":"42.1500","2. high":"42.4200","3. low":"41.4900","4. close":"42.0400","5. volume":"3091740"},"2017-11-24":{"1. open":"42.8000","2. high":"42.9000","3. low":"42.0900","4. close":"42.2100","5. volume":"1306136"},"2017-11-22":{"1. open":"41.8400","2. high":"42.6800","3. low":"41.7750","4. close":"42.6400","5. volume":"3252334"},"2017-11-21":{"1. open":"42.7300","2. high":"42.7300","3. low":"40.2200","4. close":"41.3900","5. volume":"6257368"},"2017-11-20":{"1. open":"42.2900","2. high":"42.5500","3. low":"41.7500","4. close":"42.2100","5. volume":"4844213"},"2017-11-17":{"1. open":"42.0000","2. high":"43.6000","3. low":"42.0000","4. close":"43.4000","5. volume":"3569042"},"2017-11-16":{"1. open":"42.6800","2. high":"43.0800","3. low":"42.0600","4. close":"42.3000","5. volume":"3351178"},"2017-11-15":{"1. open":"41.2700","2. high":"42.3700","3. low":"40.7300","4. close":"42.2100","5. volume":"4726434"},"2017-11-14":{"1. open":"42.9000","2. high":"42.9000","3. low":"40.6200","4. close":"41.8700","5. volume":"8095739"},"2017-11-13":{"1. open":"42.7000","2. high":"43.8700","3. low":"42.5500","4. close":"43.1300","5. volume":"3162683"},"2017-11-10":{"1. open":"42.9300","2. high":"44.4600","3. low":"42.7500","4. close":"43.0100","5. volume":"4441527"},"2017-11-09":{"1. open":"44.7100","2. high":"44.7100","3. low":"43.1100","4. close":"43.3300","5. volume":"7661245"},"2017-11-08":{"1. open":"46.7300","2. high":"46.7700","3. low":"45.3700","4. close":"45.8900","5. volume":"3348230"},"2017-11-07":{"1. open":"47.1100","2. high":"47.2040","3. low":"46.5400","4. close":"46.9700","5. volume":"2163621"},"2017-11-06":{"1. open":"47.2000","2. high":"47.6800","3. low":"46.5300","4. close":"47.2900","5. volume":"1725268"},"2017-11-03":{"1. open":"47.2500","2. high":"47.4300","3. low":"46.7100","4. close":"47.1200","5. volume":"1837775"},"2017-11-02":{"1. open":"47.6800","2. high":"47.7670","3. low":"47.0700","4. close":"47.4600","5. volume":"2057632"},"2017-11-01":{"1. open":"48.9100","2. high":"49.2700","3. low":"47.4500","4. close":"47.7000","5. volume":"3174620"},"2017-10-31":{"1. open":"47.1500","2. high":"48.0700","3. low":"46.3800","4. close":"47.7800","5. volume":"2717532"},"2017-10-30":{"1. open":"47.7500","2. high":"48.3800","3. low":"47.3700","4. close":"47.4200","5. volume":"2068082"},"2017-10-27":{"1. open":"47.8350","2. high":"48.2500","3. low":"47.0100","4. close":"47.9100","5. volume":"3854884"},"2017-10-26":{"1. open":"49.5200","2. high":"49.7300","3. low":"48.5200","4. close":"49.1500","5. volume":"3463408"},"2017-10-25":{"1. open":"49.7300","2. high":"49.8800","3. low":"48.5100","4. close":"49.5200","5. volume":"3108193"},"2017-10-24":{"1. open":"48.1300","2. high":"50.3100","3. low":"48.0600","4. close":"50.0800","5. volume":"6692106"},"2017-10-23":{"1. open":"48.0400","2. high":"48.5600","3. low":"47.8300","4. close":"47.9300","5. volume":"4019535"},"2017-10-20":{"1. open":"47.1300","2. high":"48.1300","3. low":"47.0600","4. close":"47.9300","5. volume":"4204274"},"2017-10-19":{"1. open":"46.5000","2. high":"47.7400","3. low":"46.0100","4. close":"46.5400","5. volume":"5876010"},"2017-10-18":{"1. open":"47.3800","2. high":"47.8400","3. low":"46.5100","4. close":"47.7500","5. volume":"4606081"},"2017-10-17":{"1. open":"48.6500","2. high":"48.7200","3. low":"47.4200","4. close":"47.7700","5. volume":"3955418"},"2017-10-16":{"1. open":"48.0000","2. high":"48.9300","3. low":"47.4800","4. close":"48.2400","5. volume":"4674758"},"2017-10-13":{"1. open":"48.3200","2. high":"48.6300","3. low":"47.6000","4. close":"47.7100","5. volume":"3275773"},"2017-10-12":{"1. open":"46.9500","2. high":"47.7700","3. low":"46.8000","4. close":"47.5300","5. volume":"2847149"},"2017-10-11":{"1. open":"46.7200","2. high":"47.0000","3. low":"46.2100","4. close":"46.9400","5. volume":"2727964"},"2017-10-10":{"1. open":"47.2800","2. high":"47.4500","3. low":"46.5800","4. close":"46.8900","5. volume":"3578552"},"2017-10-09":{"1. open":"47.6300","2. high":"47.7200","3. low":"46.5800","4. close":"47.0700","5. volume":"2235611"},"2017-10-06":{"1. open":"47.8900","2. high":"47.8900","3. low":"47.3000","4. close":"47.4900","5. volume":"3963440"},"2017-10-05":{"1. open":"48.0800","2. high":"48.7290","3. low":"47.6500","4. close":"48.2500","5. volume":"3191480"},"2017-10-04":{"1. open":"48.2700","2. high":"49.3000","3. low":"47.7500","4. close":"47.9100","5. volume":"4124236"},"2017-10-03":{"1. open":"47.9700","2. high":"48.3300","3. low":"47.4400","4. close":"48.3100","5. volume":"3305104"},"2017-10-02":{"1. open":"46.4300","2. high":"48.0300","3. low":"46.4100","4. close":"47.6500","5. volume":"4037598"},"2017-09-29":{"1. open":"46.4500","2. high":"47.0000","3. low":"45.9000","4. close":"46.6200","5. volume":"3822240"},"2017-09-28":{"1. open":"45.0700","2. high":"46.4600","3. low":"44.8100","4. close":"46.0800","5. volume":"5281047"},"2017-09-27":{"1. open":"45.2800","2. high":"45.5600","3. low":"44.4800","4. close":"45.0700","5. volume":"2391140"},"2017-09-26":{"1. open":"45.1100","2. high":"45.5200","3. low":"44.7200","4. close":"44.7400","5. volume":"4539017"},"2017-09-25":{"1. open":"45.3300","2. high":"45.7000","3. low":"44.6200","4. close":"45.2900","5. volume":"3071243"},"2017-09-22":{"1. open":"45.3100","2. high":"45.7800","3. low":"44.6700","4. close":"45.3800","5. volume":"3089145"},"2017-09-21":{"1. open":"47.1100","2. high":"47.2500","3. low":"45.9700","4. close":"46.2500","5. volume":"3687387"},"2017-09-20":{"1. open":"46.9800","2. high":"47.9500","3. low":"46.5300","4. close":"47.5000","5. volume":"5852935"},"2017-09-19":{"1. open":"45.2200","2. high":"46.4400","3. low":"44.8600","4. close":"46.2000","5. volume":"4854097"},"2017-09-18":{"1. open":"44.8000","2. high":"45.0900","3. low":"44.6600","4. close":"44.9100","5. volume":"3224767"},"2017-09-15":{"1. open":"44.7600","2. high":"45.0900","3. low":"44.2200","4. close":"44.6500","5. volume":"5385078"},"2017-09-14":{"1. open":"44.4800","2. high":"45.0000","3. low":"43.7500","4. close":"44.8000","5. volume":"4449460"},"2017-09-13":{"1. open":"44.6100","2. high":"45.0700","3. low":"44.3600","4. close":"44.9100","5. volume":"3351512"},"2017-09-12":{"1. open":"44.5900","2. high":"45.2000","3. low":"44.3300","4. close":"45.0000","5. volume":"4826286"},"2017-09-11":{"1. open":"43.2500","2. high":"44.4900","3. low":"43.1300","4. close":"43.6000","5. volume":"4173996"},"2017-09-08":{"1. open":"44.3700","2. high":"44.3700","3. low":"42.2400","4. close":"42.6100","5. volume":"7296016"},"2017-09-07":{"1. open":"44.1600","2. high":"44.9000","3. low":"44.0400","4. close":"44.7300","5. volume":"3326446"},"2017-09-06":{"1. open":"44.4000","2. high":"44.5000","3. low":"43.3000","4. close":"44.4300","5. volume":"3419529"},"2017-09-05":{"1. open":"45.0800","2. high":"45.1200","3. low":"43.7000","4. close":"44.4200","5. volume":"5222978"},"2017-09-01":{"1. open":"44.2100","2. high":"45.2200","3. low":"44.1300","4. close":"45.0400","5. volume":"3374580"},"2017-08-31":{"1. open":"43.6700","2. high":"44.0000","3. low":"43.1800","4. close":"43.8800","5. volume":"4088495"},"2017-08-30":{"1. open":"43.2300","2. high":"44.1000","3. low":"42.9910","4. close":"43.0900","5. volume":"5502878"},"2017-08-29":{"1. open":"41.6600","2. high":"43.1800","3. low":"41.3800","4. close":"43.0000","5. volume":"3890419"},"2017-08-28":{"1. open":"41.4300","2. high":"42.2600","3. low":"41.0500","4. close":"42.1700","5. volume":"2678449"},"2017-08-25":{"1. open":"41.6800","2. high":"41.8000","3. low":"40.8400","4. close":"41.2100","5. volume":"2729842"},"2017-08-24":{"1. open":"40.8800","2. high":"41.5500","3. low":"40.5600","4. close":"41.3400","5. volume":"3103742"},"2017-08-23":{"1. open":"39.5600","2. high":"41.4400","3. low":"39.4500","4. close":"41.0600","5. volume":"4820314"},"2017-08-22":{"1. open":"38.7400","2. high":"40.1300","3. low":"38.7300","4. close":"39.7700","5. volume":"3867097"},"2017-08-21":{"1. open":"38.1900","2. high":"38.6600","3. low":"38.0500","4. close":"38.4700","5. volume":"2331799"},"2017-08-18":{"1. open":"37.8800","2. high":"38.2100","3. low":"37.3400","4. close":"37.7600","5. volume":"2028802"},"2017-08-17":{"1. open":"39.0000","2. high":"39.0000","3. low":"37.7500","4. close":"37.8000","5. volume":"3272834"},"2017-08-16":{"1. open":"37.9600","2. high":"39.3300","3. low":"37.9100","4. close":"39.2300","5. volume":"4295678"},"2017-08-15":{"1. open":"37.3000","2. high":"37.9800","3. low":"37.1400","4. close":"37.5000","5. volume":"1826477"},"2017-08-14":{"1. open":"38.1100","2. high":"38.1580","3. low":"37.1250","4. close":"37.1900","5. volume":"2129458"},"2017-08-11":{"1. open":"37.2100","2. high":"37.9100","3. low":"36.9300","4. close":"37.7800","5. volume":"2936153"},"2017-08-10":{"1. open":"38.1200","2. high":"38.7800","3. low":"37.7150","4. close":"37.7800","5. volume":"3515585"},"2017-08-09":{"1. open":"39.2100","2. high":"39.4500","3. low":"38.4000","4. close":"38.6200","5. volume":"3692522"},"2017-08-08":{"1. open":"38.5000","2. high":"40.3620","3. low":"38.3600","4. close":"39.5800","5. volume":"8674921"},"2017-08-07":{"1. open":"38.0000","2. high":"38.4700","3. low":"37.6100","4. close":"37.9900","5. volume":"4914994"},"2017-08-04":{"1. open":"37.3400","2. high":"37.5000","3. low":"36.7300","4. close":"37.4200","5. volume":"2285810"},"2017-08-03":{"1. open":"37.2800","2. high":"37.6000","3. low":"36.9400","4. close":"37.0900","5. volume":"2884558"},"2017-08-02":{"1. open":"36.2700","2. high":"37.3300","3. low":"36.2000","4. close":"37.2800","5. volume":"2962758"},"2017-08-01":{"1. open":"36.4600","2. high":"36.7400","3. low":"35.9100","4. close":"36.3800","5. volume":"1918688"},"2017-07-31":{"1. open":"35.9700","2. high":"36.4400","3. low":"35.6650","4. close":"36.4000","5. volume":"2137320"},"2017-07-28":{"1. open":"36.1700","2. high":"36.3200","3. low":"35.5400","4. close":"35.6400","5. volume":"2851126"},"2017-07-27":{"1. open":"36.8400","2. high":"37.0700","3. low":"36.0850","4. close":"36.3600","5. volume":"2044059"},"2017-07-26":{"1. open":"37.4200","2. high":"37.6100","3. low":"36.5600","4. close":"36.6300","5. volume":"3390179"},"2017-07-25":{"1. open":"37.0700","2. high":"37.3800","3. low":"36.8650","4. close":"37.3000","5. volume":"3403471"},"2017-07-24":{"1. open":"36.5900","2. high":"36.8800","3. low":"36.5100","4. close":"36.6900","5. volume":"2244773"},"2017-07-21":{"1. open":"36.5500","2. high":"36.8590","3. low":"36.5060","4. close":"36.6200","5. volume":"2449086"},"2017-07-20":{"1. open":"35.9500","2. high":"37.3100","3. low":"35.9500","4. close":"36.7200","5. volume":"4745762"},"2017-07-19":{"1. open":"36.6100","2. high":"36.6200","3. low":"36.0700","4. close":"36.5000","5. volume":"4431844"},"2017-07-18":{"1. open":"36.4000","2. high":"36.4800","3. low":"35.8000","4. close":"36.4300","5. volume":"3049846"},"2017-07-17":{"1. open":"36.4400","2. high":"36.6900","3. low":"36.2050","4. close":"36.4000","5. volume":"3453010"},"2017-07-14":{"1. open":"36.2000","2. high":"36.4400","3. low":"35.9800","4. close":"36.3200","5. volume":"3966487"},"2017-07-13":{"1. open":"35.4500","2. high":"36.3800","3. low":"35.4300","4. close":"36.0100","5. volume":"5277848"},"2017-07-12":{"1. open":"35.2500","2. high":"35.4700","3. low":"34.4400","4. close":"34.6000","5. volume":"4134442"},"2017-07-11":{"1. open":"34.2200","2. high":"35.0800","3. low":"33.9900","4. close":"35.0000","5. volume":"4244142"},"2017-07-10":{"1. open":"33.9100","2. high":"34.4500","3. low":"33.6800","4. close":"34.1400","5. volume":"3036347"},"2017-07-07":{"1. open":"34.0000","2. high":"34.3700","3. low":"33.2650","4. close":"34.1900","5. volume":"3772263"},"2017-07-06":{"1. open":"33.6100","2. high":"35.3800","3. low":"33.6000","4. close":"33.8900","5. volume":"6220940"},"2017-07-05":{"1. open":"34.1700","2. high":"34.2550","3. low":"33.5700","4. close":"33.7700","5. volume":"4006069"},"2017-07-03":{"1. open":"32.9400","2. high":"34.3000","3. low":"32.9150","4. close":"34.0200","5. volume":"3112086"},"2017-06-30":{"1. open":"33.1600","2. high":"33.4500","3. low":"32.5350","4. close":"32.6500","5. volume":"3014777"},"2017-06-29":{"1. open":"33.1100","2. high":"33.3400","3. low":"32.6100","4. close":"33.1800","5. volume":"3730077"},"2017-06-28":{"1. open":"32.1000","2. high":"33.0000","3. low":"31.9300","4. close":"32.9500","5. volume":"3764296"},"2017-06-27":{"1. open":"31.6000","2. high":"32.5000","3. low":"31.4900","4. close":"31.6300","5. volume":"5463485"},"2017-06-26":{"1. open":"31.1900","2. high":"31.2950","3. low":"30.6500","4. close":"31.1800","5. volume":"2935982"},"2017-06-23":{"1. open":"30.1300","2. high":"31.4300","3. low":"29.7900","4. close":"31.0900","5. volume":"6287723"},"2017-06-22":{"1. open":"29.8100","2. high":"30.2500","3. low":"29.6600","4. close":"29.8000","5. volume":"2906662"},"2017-06-21":{"1. open":"30.5900","2. high":"30.5900","3. low":"29.6350","4. close":"29.6900","5. volume":"3485500"},"2017-06-20":{"1. open":"30.6900","2. high":"31.0950","3. low":"30.4100","4. close":"30.4500","5. volume":"2566746"},"2017-06-19":{"1. open":"30.3700","2. high":"31.3000","3. low":"30.1600","4. close":"30.8900","5. volume":"3909102"},"2017-06-16":{"1. open":"30.8000","2. high":"30.8630","3. low":"29.5500","4. close":"30.0000","5. volume":"4741975"},"2017-06-15":{"1. open":"31.1200","2. high":"31.4500","3. low":"30.6100","4. close":"30.7400","5. volume":"3224303"},"2017-06-14":{"1. open":"32.5700","2. high":"32.6800","3. low":"31.2100","4. close":"31.5400","5. volume":"3714380"},"2017-06-13":{"1. open":"31.9700","2. high":"32.5480","3. low":"31.5500","4. close":"32.4800","5. volume":"2995123"},"2017-06-12":{"1. open":"32.8200","2. high":"33.2100","3. low":"31.7800","4. close":"31.7800","5. volume":"4709295"},"2017-06-09":{"1. open":"33.6400","2. high":"34.0000","3. low":"32.8500","4. close":"33.0100","5. volume":"3063086"},"2017-06-08":{"1. open":"32.6000","2. high":"33.6500","3. low":"32.5900","4. close":"33.5000","5. volume":"3274208"},"2017-06-07":{"1. open":"33.1500","2. high":"33.1700","3. low":"32.4000","4. close":"32.8200","5. volume":"3329688"},"2017-06-06":{"1. open":"33.1100","2. high":"33.4900","3. low":"32.7800","4. close":"32.9400","5. volume":"2295347"},"2017-06-05":{"1. open":"32.6500","2. high":"33.5800","3. low":"32.6500","4. close":"33.3200","5. volume":"2604958"},"2017-06-02":{"1. open":"32.3900","2. high":"33.0000","3. low":"32.3500","4. close":"32.8600","5. volume":"2633226"},"2017-06-01":{"1. open":"32.8400","2. high":"33.4500","3. low":"32.4500","4. close":"32.9400","5. volume":"2372191"},"2017-05-31":{"1. open":"32.8800","2. high":"33.0500","3. low":"31.7600","4. close":"32.9400","5. volume":"4491991"},"2017-05-30":{"1. open":"33.0300","2. high":"33.1600","3. low":"32.5300","4. close":"32.9900","5. volume":"3215090"},"2017-05-26":{"1. open":"32.8700","2. high":"33.3600","3. low":"32.8700","4. close":"33.2700","5. volume":"2369666"},"2017-05-25":{"1. open":"33.6800","2. high":"34.0900","3. low":"33.0300","4. close":"33.0900","5. volume":"2321565"},"2017-05-24":{"1. open":"33.2700","2. high":"33.9200","3. low":"33.0450","4. close":"33.5100","5. volume":"3338172"},"2017-05-23":{"1. open":"32.9800","2. high":"33.3600","3. low":"32.5600","4. close":"33.2600","5. volume":"2949100"},"2017-05-22":{"1. open":"32.6500","2. high":"33.2000","3. low":"32.4700","4. close":"32.9600","5. volume":"3402047"},"2017-05-19":{"1. open":"32.1600","2. high":"32.8800","3. low":"32.1000","4. close":"32.2900","5. volume":"2606084"},"2017-05-18":{"1. open":"31.4500","2. high":"32.1700","3. low":"31.1000","4. close":"31.9200","5. volume":"2394271"},"2017-05-17":{"1. open":"31.8800","2. high":"32.2200","3. low":"31.5800","4. close":"31.6300","5. volume":"3707349"},"2017-05-16":{"1. open":"32.1000","2. high":"32.4000","3. low":"31.7500","4. close":"32.1600","5. volume":"2993409"},"2017-05-15":{"1. open":"32.1700","2. high":"32.5000","3. low":"31.9700","4. close":"32.0300","5. volume":"2383950"},"2017-05-12":{"1. open":"31.0000","2. high":"32.1300","3. low":"30.9600","4. close":"31.7900","5. volume":"3379716"},"2017-05-11":{"1. open":"31.2300","2. high":"31.3100","3. low":"30.4500","4. close":"31.1600","5. volume":"4109259"},"2017-05-10":{"1. open":"30.9500","2. high":"31.4600","3. low":"30.7000","4. close":"31.0800","5. volume":"3486451"},"2017-05-09":{"1. open":"31.2200","2. high":"31.2400","3. low":"30.4600","4. close":"30.8200","5. volume":"3413988"},"2017-05-08":{"1. open":"31.3700","2. high":"31.3700","3. low":"30.6600","4. close":"31.0200","5. volume":"3780789"},"2017-05-05":{"1. open":"31.3500","2. high":"31.9600","3. low":"31.0500","4. close":"31.8200","5. volume":"4031041"},"2017-05-04":{"1. open":"31.2200","2. high":"31.3600","3. low":"30.4200","4. close":"31.0400","5. volume":"7900198"},"2017-05-03":{"1. open":"32.9000","2. high":"32.9000","3. low":"31.5100","4. close":"31.6900","5. volume":"7328528"},"2017-05-02":{"1. open":"33.3100","2. high":"34.3300","3. low":"33.3000","4. close":"33.3300","5. volume":"3882041"},"2017-05-01":{"1. open":"33.9500","2. high":"34.1300","3. low":"32.9000","4. close":"33.2800","5. volume":"4984140"},"2017-04-28":{"1. open":"34.8100","2. high":"34.9450","3. low":"33.6800","4. close":"33.7300","5. volume":"5238656"},"2017-04-27":{"1. open":"35.7500","2. high":"35.9000","3. low":"34.1550","4. close":"34.5200","5. volume":"14763506"},"2017-04-26":{"1. open":"36.0000","2. high":"37.2000","3. low":"35.8500","4. close":"36.4500","5. volume":"7369332"},"2017-04-25":{"1. open":"34.2300","2. high":"36.5500","3. low":"34.2300","4. close":"36.4900","5. volume":"11075292"},"2017-04-24":{"1. open":"32.2400","2. high":"33.4400","3. low":"32.1500","4. close":"33.3100","5. volume":"7907300"},"2017-04-21":{"1. open":"32.2000","2. high":"32.5500","3. low":"31.6500","4. close":"31.7000","5. volume":"5043928"},"2017-04-20":{"1. open":"31.8900","2. high":"32.3000","3. low":"31.4600","4. close":"32.0400","5. volume":"5429646"},"2017-04-19":{"1. open":"32.1800","2. high":"32.4400","3. low":"31.2800","4. close":"31.3000","5. volume":"2465529"},"2017-04-18":{"1. open":"30.7800","2. high":"32.3700","3. low":"30.4500","4. close":"31.7600","5. volume":"5018853"},"2017-04-17":{"1. open":"31.1700","2. high":"31.7900","3. low":"30.9700","4. close":"31.3100","5. volume":"4099722"},"2017-04-13":{"1. open":"32.1100","2. high":"32.4700","3. low":"30.9900","4. close":"30.9900","5. volume":"6143280"},"2017-04-12":{"1. open":"33.8600","2. high":"34.2900","3. low":"32.0300","4. close":"32.0500","5. volume":"7603354"},"2017-04-11":{"1. open":"33.5700","2. high":"34.4600","3. low":"33.1500","4. close":"34.3900","5. volume":"3142542"},"2017-04-10":{"1. open":"33.6600","2. high":"33.7800","3. low":"33.2000","4. close":"33.6600","5. volume":"2575451"},"2017-04-07":{"1. open":"33.2500","2. high":"34.1300","3. low":"33.1510","4. close":"33.7300","5. volume":"3673929"},"2017-04-06":{"1. open":"33.8500","2. high":"34.1600","3. low":"33.1900","4. close":"33.6500","5. volume":"3627131"},"2017-04-05":{"1. open":"34.7900","2. high":"35.0900","3. low":"33.7550","4. close":"33.8500","5. volume":"4016824"},"2017-04-04":{"1. open":"34.0300","2. high":"34.5000","3. low":"33.8210","4. close":"34.2300","5. volume":"2297037"},"2017-04-03":{"1. open":"34.6200","2. high":"35.0000","3. low":"33.5020","4. close":"34.2200","5. volume":"4204663"},"2017-03-31":{"1. open":"34.0600","2. high":"34.7400","3. low":"33.6000","4. close":"34.4000","5. volume":"5188399"},"2017-03-30":{"1. open":"33.1500","2. high":"35.1400","3. low":"32.9600","4. close":"33.4900","5. volume":"7122597"},"2017-03-29":{"1. open":"32.9100","2. high":"33.2900","3. low":"32.7300","4. close":"32.9100","5. volume":"2611803"},"2017-03-28":{"1. open":"32.5000","2. high":"33.6370","3. low":"32.4500","4. close":"32.9200","5. volume":"4039664"},"2017-03-27":{"1. open":"31.7400","2. high":"32.5700","3. low":"31.2900","4. close":"32.4700","5. volume":"3654475"},"2017-03-24":{"1. open":"33.6100","2. high":"33.8600","3. low":"32.3650","4. close":"32.5600","5. volume":"4110369"},"2017-03-23":{"1. open":"33.4100","2. high":"33.6900","3. low":"33.1100","4. close":"33.3100","5. volume":"3071983"},"2017-03-22":{"1. open":"33.3500","2. high":"34.1500","3. low":"33.0100","4. close":"33.6900","5. volume":"2878415"},"2017-03-21":{"1. open":"34.9000","2. high":"35.2500","3. low":"33.1700","4. close":"33.2200","5. volume":"4540663"},"2017-03-20":{"1. open":"34.9000","2. high":"35.3600","3. low":"34.1000","4. close":"34.9000","5. volume":"2688853"},"2017-03-17":{"1. open":"35.5700","2. high":"35.9800","3. low":"34.9500","4. close":"34.9700","5. volume":"3827967"},"2017-03-16":{"1. open":"35.6600","2. high":"35.9900","3. low":"34.9800","4. close":"35.3800","5. volume":"3644274"},"2017-03-15":{"1. open":"34.4000","2. high":"35.2900","3. low":"33.9500","4. close":"35.1400","5. volume":"3753386"},"2017-03-14":{"1. open":"34.4500","2. high":"34.5800","3. low":"33.7700","4. close":"34.1900","5. volume":"3113001"},"2017-03-13":{"1. open":"35.2100","2. high":"35.5200","3. low":"34.5300","4. close":"34.7000","5. volume":"2491431"},"2017-03-10":{"1. open":"35.9000","2. high":"36.0000","3. low":"34.2350","4. close":"34.5300","5. volume":"4052315"},"2017-03-09":{"1. open":"36.0700","2. high":"36.5500","3. low":"34.8900","4. close":"35.3600","5. volume":"4826219"},"2017-03-08":{"1. open":"35.9000","2. high":"36.8200","3. low":"35.9000","4. close":"35.9900","5. volume":"4485667"},"2017-03-07":{"1. open":"36.8100","2. high":"36.8900","3. low":"35.7500","4. close":"35.8000","5. volume":"3753385"},"2017-03-06":{"1. open":"36.8000","2. high":"37.4800","3. low":"35.8000","4. close":"36.9300","5. volume":"5764124"},"2017-03-03":{"1. open":"36.0600","2. high":"36.8900","3. low":"35.7500","4. close":"36.3800","5. volume":"3238051"},"2017-03-02":{"1. open":"37.6400","2. high":"38.1700","3. low":"35.8300","4. close":"35.8500","5. volume":"5098625"},"2017-03-01":{"1. open":"35.9300","2. high":"38.1500","3. low":"35.8500","4. close":"37.9900","5. volume":"10564474"},"2017-02-28":{"1. open":"34.7300","2. high":"35.3300","3. low":"34.4000","4. close":"34.5900","5. volume":"4034102"},"2017-02-27":{"1. open":"34.5200","2. high":"35.3800","3. low":"34.1900","4. close":"34.7800","5. volume":"3898218"},"2017-02-24":{"1. open":"33.8100","2. high":"34.6400","3. low":"33.3500","4. close":"34.4800","5. volume":"5763834"},"2017-02-23":{"1. open":"36.8600","2. high":"36.8800","3. low":"34.2600","4. close":"34.3200","5. volume":"7139960"},"2017-02-22":{"1. open":"36.4000","2. high":"36.7100","3. low":"36.2100","4. close":"36.6000","5. volume":"2587865"},"2017-02-21":{"1. open":"36.3100","2. high":"37.0100","3. low":"36.2300","4. close":"36.7100","5. volume":"3393391"},"2017-02-17":{"1. open":"36.2400","2. high":"36.6100","3. low":"35.7900","4. close":"36.2100","5. volume":"4516538"},"2017-02-16":{"1. open":"37.8200","2. high":"37.8300","3. low":"36.3500","4. close":"36.4600","5. volume":"7040708"},"2017-02-15":{"1. open":"38.2500","2. high":"38.3000","3. low":"37.7300","4. close":"37.8700","5. volume":"11488878"},"2017-02-14":{"1. open":"38.5700","2. high":"39.2500","3. low":"38.1800","4. close":"38.5600","5. volume":"3754357"},"2017-02-13":{"1. open":"38.7900","2. high":"39.7800","3. low":"38.4500","4. close":"38.4800","5. volume":"5366057"},"2017-02-10":{"1. open":"37.9200","2. high":"38.5400","3. low":"37.5050","4. close":"38.3000","5. volume":"3629116"},"2017-02-09":{"1. open":"37.4100","2. high":"37.7500","3. low":"36.9940","4. close":"37.4200","5. volume":"3392385"},"2017-02-08":{"1. open":"37.9300","2. high":"38.5000","3. low":"37.1100","4. close":"37.5400","5. volume":"3119915"},"2017-02-07":{"1. open":"38.0400","2. high":"38.2500","3. low":"37.3100","4. close":"37.9700","5. volume":"3269794"},"2017-02-06":{"1. open":"36.9000","2. high":"38.0000","3. low":"36.8000","4. close":"37.7500","5. volume":"2833638"},"2017-02-03":{"1. open":"37.8700","2. high":"38.0500","3. low":"36.8300","4. close":"36.8600","5. volume":"5243205"},"2017-02-02":{"1. open":"36.7000","2. high":"38.3700","3. low":"36.6300","4. close":"37.6800","5. volume":"5049682"},"2017-02-01":{"1. open":"36.5800","2. high":"37.1900","3. low":"36.2000","4. close":"36.2600","5. volume":"2905397"},"2017-01-31":{"1. open":"36.7800","2. high":"37.2300","3. low":"36.0100","4. close":"36.4500","5. volume":"2690080"},"2017-01-30":{"1. open":"36.4800","2. high":"36.5900","3. low":"35.7700","4. close":"36.5500","5. volume":"3002400"},"2017-01-27":{"1. open":"36.3000","2. high":"37.3900","3. low":"36.2700","4. close":"36.6700","5. volume":"3617786"},"2017-01-26":{"1. open":"36.2200","2. high":"37.0699","3. low":"35.5100","4. close":"36.3000","5. volume":"5735365"},"2017-01-25":{"1. open":"38.5800","2. high":"38.9400","3. low":"36.3100","4. close":"36.5300","5. volume":"13583342"},"2017-01-24":{"1. open":"37.1800","2. high":"38.3800","3. low":"37.1800","4. close":"37.5000","5. volume":"11911148"},"2017-01-23":{"1. open":"35.9200","2. high":"36.3950","3. low":"35.4550","4. close":"36.2900","5. volume":"5244644"},"2017-01-20":{"1. open":"35.4000","2. high":"35.7400","3. low":"34.9300","4. close":"35.6600","5. volume":"5330764"},"2017-01-19":{"1. open":"34.2200","2. high":"35.6300","3. low":"34.1800","4. close":"35.4200","5. volume":"5050105"},"2017-01-18":{"1. open":"32.9500","2. high":"34.8300","3. low":"32.6400","4. close":"34.8100","5. volume":"6417754"},"2017-01-17":{"1. open":"32.9700","2. high":"33.0400","3. low":"32.5200","4. close":"32.6400","5. volume":"1382009"},"2017-01-13":{"1. open":"32.8200","2. high":"33.4300","3. low":"32.5300","4. close":"33.0100","5. volume":"3026692"},"2017-01-12":{"1. open":"33.0000","2. high":"33.5000","3. low":"32.5100","4. close":"33.0400","5. volume":"4519604"},"2017-01-11":{"1. open":"31.0800","2. high":"32.0000","3. low":"31.0800","4. close":"31.9700","5. volume":"3068269"},"2017-01-10":{"1. open":"29.8300","2. high":"31.1000","3. low":"29.7300","4. close":"30.9800","5. volume":"3824409"},"2017-01-09":{"1. open":"30.8800","2. high":"30.8800","3. low":"29.2150","4. close":"29.4800","5. volume":"4199908"},"2017-01-06":{"1. open":"30.6900","2. high":"31.1000","3. low":"30.3100","4. close":"30.6800","5. volume":"2086333"},"2017-01-05":{"1. open":"30.1800","2. high":"30.9300","3. low":"30.1150","4. close":"30.6500","5. volume":"2444552"},"2017-01-04":{"1. open":"29.0200","2. high":"30.3000","3. low":"29.0200","4. close":"30.2600","5. volume":"3339121"},"2017-01-03":{"1. open":"28.6000","2. high":"28.8700","3. low":"28.1700","4. close":"28.8300","5. volume":"2746634"},"2016-12-30":{"1. open":"28.9700","2. high":"29.3779","3. low":"28.0100","4. close":"28.0800","5. volume":"2685997"},"2016-12-29":{"1. open":"29.4300","2. high":"29.4400","3. low":"28.6000","4. close":"28.8900","5. volume":"3224941"},"2016-12-28":{"1. open":"29.7800","2. high":"30.1700","3. low":"29.3500","4. close":"29.4300","5. volume":"2751053"},"2016-12-27":{"1. open":"29.5800","2. high":"30.0400","3. low":"29.4000","4. close":"29.6500","5. volume":"1708938"},"2016-12-23":{"1. open":"29.7900","2. high":"30.1300","3. low":"29.3400","4. close":"29.7100","5. volume":"2887430"},"2016-12-22":{"1. open":"30.2100","2. high":"30.3500","3. low":"29.5400","4. close":"29.7500","5. volume":"3766694"},"2016-12-21":{"1. open":"30.1900","2. high":"30.4300","3. low":"30.0200","4. close":"30.4300","5. volume":"1811751"},"2016-12-20":{"1. open":"29.9000","2. high":"30.3300","3. low":"29.7700","4. close":"30.1600","5. volume":"3826971"},"2016-12-19":{"1. open":"28.8900","2. high":"29.4900","3. low":"28.7500","4. close":"29.2900","5. volume":"2569496"},"2016-12-16":{"1. open":"29.6500","2. high":"30.4200","3. low":"29.1600","4. close":"29.4000","5. volume":"8131428"},"2016-12-15":{"1. open":"30.1600","2. high":"30.4400","3. low":"29.6500","4. close":"29.7900","5. volume":"3753185"},"2016-12-14":{"1. open":"30.1100","2. high":"31.3200","3. low":"30.0300","4. close":"30.4500","5. volume":"3176106"},"2016-12-13":{"1. open":"31.4000","2. high":"31.7300","3. low":"30.0300","4. close":"30.2400","5. volume":"4215143"},"2016-12-12":{"1. open":"32.1600","2. high":"32.3500","3. low":"30.8500","4. close":"31.2400","5. volume":"3416012"},"2016-12-09":{"1. open":"31.3100","2. high":"32.1100","3. low":"31.0400","4. close":"32.0500","5. volume":"4344295"},"2016-12-08":{"1. open":"31.2800","2. high":"31.8400","3. low":"30.8000","4. close":"31.3100","5. volume":"3064978"},"2016-12-07":{"1. open":"31.3000","2. high":"31.8900","3. low":"30.7653","4. close":"30.9000","5. volume":"5778259"},"2016-12-06":{"1. open":"30.7100","2. high":"31.1900","3. low":"30.2100","4. close":"31.1500","5. volume":"3248595"},"2016-12-05":{"1. open":"29.0300","2. high":"31.2768","3. low":"28.8900","4. close":"31.2200","5. volume":"7034136"},"2016-12-02":{"1. open":"28.8600","2. high":"29.6250","3. low":"28.7300","4. close":"29.0400","5. volume":"3870676"},"2016-12-01":{"1. open":"28.8400","2. high":"29.4200","3. low":"28.6000","4. close":"28.8800","5. volume":"5006186"},"2016-11-30":{"1. open":"30.0600","2. high":"30.4400","3. low":"28.8500","4. close":"28.9700","5. volume":"5131539"},"2016-11-29":{"1. open":"30.0200","2. high":"30.4999","3. low":"29.7300","4. close":"29.7300","5. volume":"4927708"},"2016-11-28":{"1. open":"31.4800","2. high":"31.8000","3. low":"30.7000","4. close":"30.8600","5. volume":"5121935"},"2016-11-25":{"1. open":"31.2400","2. high":"32.1900","3. low":"31.1100","4. close":"31.7000","5. volume":"3109628"},"2016-11-23":{"1. open":"31.0000","2. high":"31.9300","3. low":"30.0000","4. close":"31.5100","5. volume":"4112265"},"2016-11-22":{"1. open":"31.1000","2. high":"31.9100","3. low":"30.5400","4. close":"31.3400","5. volume":"4182721"},"2016-11-21":{"1. open":"30.8900","2. high":"30.9800","3. low":"29.5010","4. close":"30.6900","5. volume":"2986107"},"2016-11-18":{"1. open":"31.7300","2. high":"31.7700","3. low":"30.1600","4. close":"30.4200","5. volume":"4421730"},"2016-11-17":{"1. open":"31.3000","2. high":"32.0200","3. low":"30.7700","4. close":"31.8500","5. volume":"4693203"},"2016-11-16":{"1. open":"29.6900","2. high":"31.6900","3. low":"29.6600","4. close":"31.4200","5. volume":"6150098"},"2016-11-15":{"1. open":"28.9400","2. high":"30.2300","3. low":"28.8300","4. close":"30.2100","5. volume":"3668883"},"2016-11-14":{"1. open":"29.5000","2. high":"29.9400","3. low":"28.6100","4. close":"29.6200","5. volume":"5156737"},"2016-11-11":{"1. open":"29.1800","2. high":"29.9900","3. low":"27.6300","4. close":"29.3000","5. volume":"5337239"},"2016-11-10":{"1. open":"29.0800","2. high":"29.7000","3. low":"28.3000","4. close":"29.1000","5. volume":"8189887"},"2016-11-09":{"1. open":"26.8300","2. high":"29.1400","3. low":"26.0000","4. close":"28.7200","5. volume":"10675856"},"2016-11-08":{"1. open":"24.3000","2. high":"26.5900","3. low":"24.3000","4. close":"26.4000","5. volume":"6469979"},"2016-11-07":{"1. open":"25.5400","2. high":"26.4100","3. low":"24.8900","4. close":"25.0800","5. volume":"8377025"},"2016-11-04":{"1. open":"23.8200","2. high":"25.5000","3. low":"23.5600","4. close":"25.2000","5. volume":"6878500"},"2016-11-03":{"1. open":"22.9600","2. high":"24.3493","3. low":"22.9400","4. close":"24.1500","5. volume":"8083097"},"2016-11-02":{"1. open":"22.6700","2. high":"23.2650","3. low":"22.6358","4. close":"22.9100","5. volume":"10755328"},"2016-11-01":{"1. open":"22.1000","2. high":"23.5500","3. low":"21.7800","4. close":"23.0000","5. volume":"32216510"}}})
+		
+	    
+</script>
+</body>
+</html>
